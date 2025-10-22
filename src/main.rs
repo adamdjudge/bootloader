@@ -1,20 +1,20 @@
 #![no_std]
 #![no_main]
 
+mod port;
+mod console;
+
 use core::arch::global_asm;
+use core::fmt::Write;
 use core::panic::PanicInfo;
 
 global_asm!(include_str!("start.s"), options(att_syntax));
 
 #[unsafe(no_mangle)]
 fn main() -> ! {
-    let screen = 0xb8000 as *mut u8;
-    for i in 0..80*25 {
-        unsafe { *screen.offset(i*2) = 0; }
-    }
-    for (i, c) in "Hello, world!".bytes().enumerate() {
-        unsafe { *screen.offset(i as isize * 2) = c; }
-    }
+    console::init();
+    let mut writer = console::ConsoleWriter::new();
+    writer.write_str("Hello from Rust!").unwrap();
     loop {}
 }
 
