@@ -3,8 +3,6 @@
 # Copyright 2025 Adam Judge
 # ==============================================================================
 
-STACK_TOP = 0x8000
-
 GDT_CS = 0x08
 GDT_DS = 0x10
 
@@ -17,7 +15,6 @@ GDT_DS = 0x10
 .code16
 _start:
     cli
-    movl $STACK_TOP, %esp
 
     # Enable A20 through the keyboard controller.
     call kbc_wait
@@ -53,6 +50,7 @@ enter_protected_mode:
     mov %ax, %es
     mov %ax, %fs
     mov %ax, %gs
+    mov $__loram_top, %esp
     jmp main
 
 # ==============================================================================

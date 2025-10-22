@@ -31,6 +31,7 @@ SECTIONS
     } > LO_RAM
 
     __bss_end = .;
+    __loram_top = ORIGIN(LO_RAM) + LENGTH(LO_RAM);
 
     /DISCARD/ :
     {
