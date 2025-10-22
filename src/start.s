@@ -16,30 +16,12 @@ GDT_DS = 0x10
 _start:
     cli
 
-    # Enable A20 through the keyboard controller.
-    call kbc_wait
-    mov $0xD1, %al
-    out %al, $0x64
-    call kbc_wait
-    mov $0xDF, %al
-    out %al, $0x60
-    call kbc_wait
-
     # Load GDT and enable protected mode.
     lgdt gdt_desc
     mov %cr0, %eax
     or $1, %al
     mov %eax, %cr0
     jmpl $GDT_CS, $enter_protected_mode
-
-kbc_wait:
-    mov $10000, %cx
-1:
-    loop 1b
-    in $0x64, %al
-    test $2, %al
-    jnz kbc_wait
-    ret
 
 # Start of 32-bit protected mode code.
 .code32
@@ -63,7 +45,7 @@ enter_protected_mode:
 # Kept in .text.start to ensure it doesn't go out of range of 16-bit address
 gdt_desc:
     .short gdt_end - gdt_start - 1
-    .4byte gdt_start
+    .int gdt_start
 
 .rodata
 .align 8
