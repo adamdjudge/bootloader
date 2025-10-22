@@ -4,7 +4,7 @@
 mod port;
 mod console;
 
-use core::arch::global_asm;
+use core::arch::{asm, global_asm};
 use core::fmt::Write;
 use core::panic::PanicInfo;
 
@@ -12,10 +12,15 @@ global_asm!(include_str!("start.s"), options(att_syntax));
 
 #[unsafe(no_mangle)]
 fn main() -> ! {
+    let x = 42;
+    
     console::init();
     let mut writer = console::ConsoleWriter::new();
-    writer.write_str("Hello from Rust!").unwrap();
-    loop {}
+    write!(&mut writer, "Hello from Rust! Number = {}", x).unwrap();
+    
+    loop {
+        unsafe { asm!("hlt"); }
+    }
 }
 
 #[inline(never)]

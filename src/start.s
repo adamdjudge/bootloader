@@ -59,16 +59,20 @@ enter_protected_mode:
 # Processor Data Structures
 # ==============================================================================
 
+.align 2
+
+# GDT Descriptor
+# Kept in .text.start to ensure it doesn't go out of range of 16-bit address
+gdt_desc:
+    .short gdt_end - gdt_start - 1
+    .4byte gdt_start
+
 .rodata
 .align 8
 
 # Global Descriptor Table
-gdt:
+gdt_start:
     .quad 0x0000000000000000  # Null segment
     .quad 0x00CF9B000000FFFF  # Code segment
     .quad 0x00CF93000000FFFF  # Data segment
-
-# GDT Descriptor
-gdt_desc:
-    .short gdt_desc - gdt - 1
-    .4byte gdt
+gdt_end:
