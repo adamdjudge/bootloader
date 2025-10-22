@@ -1,0 +1,19 @@
+[package]
+name = "bootloader"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "bootloader"
+path = "src/main.rs"
+test = false
+doctest = false
+bench = false
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+
+[dependencies]
