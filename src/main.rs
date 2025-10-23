@@ -1,8 +1,8 @@
 #![no_std]
 #![no_main]
 
-mod port;
 mod console;
+mod port;
 
 use core::arch::{asm, global_asm};
 use core::fmt::Write;
@@ -17,9 +17,11 @@ fn main() -> ! {
     for i in 0..=10000 {
         let _ = write!(writer, "Hello from Rust! This is line {}\n", i);
     }
-    
+
     loop {
-        unsafe { asm!("hlt"); }
+        unsafe {
+            asm!("hlt");
+        }
     }
 }
 

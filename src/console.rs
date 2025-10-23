@@ -69,7 +69,9 @@ fn update_cursor() {
 /// within bounds (`pos < WIDTH * HEIGHT`), otherwise returns `Err(pos)` and has no effect.
 pub fn set_position(pos: usize) -> Result<(), usize> {
     if pos < WIDTH * HEIGHT {
-        unsafe { POSITION = pos; }
+        unsafe {
+            POSITION = pos;
+        }
         update_cursor();
         Ok(())
     } else {
@@ -84,12 +86,16 @@ pub fn get_position() -> usize {
 
 /// Sets the text color for subsequent character writes to the console.
 pub fn set_text_color(color: Color) {
-    unsafe { COLOR = COLOR & 0xf0 | color as u8; }
+    unsafe {
+        COLOR = COLOR & 0xf0 | color as u8;
+    }
 }
 
 /// Sets the background color for subsequent character writes to the console.
 pub fn set_bg_color(color: Color) {
-    unsafe { COLOR = COLOR & 0x0f | (color as u8) << 4; }
+    unsafe {
+        COLOR = COLOR & 0x0f | (color as u8) << 4;
+    }
 }
 
 fn advance(count: usize) {
@@ -103,9 +109,9 @@ fn advance(count: usize) {
         let buffer = unsafe { &mut *VGA_BUFFER };
         for line in 1..HEIGHT {
             let (prev, curr) = buffer.chars.split_at_mut(line * WIDTH);
-            prev[(line-1)*WIDTH..].clone_from_slice(&curr[..WIDTH]);
+            prev[(line - 1) * WIDTH..].clone_from_slice(&curr[..WIDTH]);
         }
-        buffer.chars[(HEIGHT-1)*WIDTH..].fill(VgaChar::from(0));
+        buffer.chars[(HEIGHT - 1) * WIDTH..].fill(VgaChar::from(0));
     }
 }
 
@@ -133,7 +139,7 @@ pub fn put_char(c: char) {
         '\n' => advance(WIDTH - get_position() % WIDTH),
         ' '..='~' => put_byte(c as u8),
         '\u{80}'.. => put_byte(0xfe),
-        _ => {},
+        _ => {}
     }
 }
 
