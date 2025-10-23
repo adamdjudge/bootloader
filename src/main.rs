@@ -12,11 +12,11 @@ global_asm!(include_str!("start.s"), options(att_syntax));
 
 #[unsafe(no_mangle)]
 fn main() -> ! {
-    let x = 42;
-    
-    console::init();
+    console::clear();
     let mut writer = console::ConsoleWriter::new();
-    write!(&mut writer, "Hello from Rust! Number = {}", x).unwrap();
+    for i in 0..=10000 {
+        let _ = write!(writer, "Hello from Rust! This is line {}\n", i);
+    }
     
     loop {
         unsafe { asm!("hlt"); }
