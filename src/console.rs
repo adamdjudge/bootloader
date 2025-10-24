@@ -1,4 +1,5 @@
 use core::fmt;
+use core::mem;
 
 use crate::port;
 
@@ -28,6 +29,16 @@ pub enum Color {
     Pink,
     Yellow,
     White,
+}
+
+impl TryFrom<u8> for Color {
+    type Error = u8;
+    fn try_from(val: u8) -> Result<Self, Self::Error> {
+        match val {
+            0..16 => Ok(unsafe { mem::transmute(val) }),
+            _ => Err(val),
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

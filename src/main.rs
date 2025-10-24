@@ -14,8 +14,15 @@ global_asm!(include_str!("start.s"), options(att_syntax));
 fn main() -> ! {
     console::clear();
     let mut writer = console::ConsoleWriter::new();
-    for i in 0..=10000 {
-        let _ = write!(writer, "Hello from Rust! This is line {}\n", i);
+    let _ = write!(&mut writer, "Hello from Rust on x86!\n\n");
+
+    for bg in 0..16 {
+        console::set_bg_color(bg.try_into().unwrap());
+        for fg in 0..16 {
+            console::set_text_color(fg.try_into().unwrap());
+            let _ = write!(&mut writer, " {:02x} ", bg << 4 | fg);
+        }
+        console::put_char('\n');
     }
 
     loop {
@@ -27,6 +34,22 @@ fn main() -> ! {
 
 #[inline(never)]
 #[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
+fn panic(info: &PanicInfo) -> ! {
+    console::set_bg_color(console::Color::Black);
+    console::set_text_color(console::Color::LightGray);
+    let mut writer = console::ConsoleWriter::new();
+
+    if let Some(location) = info.location() {
+        let _ = write!(
+            &mut writer,
+            "\npanicked at {}:{} - {}",
+            location.file(),
+            location.line(),
+            info.message()
+        );
+    } else {
+        let _ = write!(&mut writer, "\npanicked - {}", info.message());
+    }
+
     loop {}
 }
