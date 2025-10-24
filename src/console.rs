@@ -51,7 +51,11 @@ struct VgaBuffer {
     chars: [VgaChar; WIDTH * HEIGHT],
 }
 
-const VGA_BUFFER: *mut VgaBuffer = 0xb8000 as *mut VgaBuffer;
+impl VgaBuffer {
+    fn get() -> &'static mut Self {
+        unsafe { &mut *(0xb8000 as *mut Self) }
+    }
+}
 
 static mut POSITION: usize = 0;
 static mut COLOR: u8 = Color::LightGray as u8;
@@ -105,8 +109,8 @@ fn advance(count: usize) {
     } else {
         let _ = set_position(WIDTH * (HEIGHT - 1));
 
-        // Scroll text lines up
-        let buffer = unsafe { &mut *VGA_BUFFER };
+        // Scroll text lines up, and then clear the bottom line
+        let buffer = VgaBuffer::get();
         for line in 1..HEIGHT {
             let (prev, curr) = buffer.chars.split_at_mut(line * WIDTH);
             prev[(line - 1) * WIDTH..].clone_from_slice(&curr[..WIDTH]);
@@ -116,9 +120,8 @@ fn advance(count: usize) {
 }
 
 fn put_byte(b: u8) {
-    let buffer = unsafe { &mut *VGA_BUFFER };
     let pos = get_position();
-    buffer.chars[pos] = VgaChar::from(b);
+    VgaBuffer::get().chars[pos] = VgaChar::from(b);
     advance(1);
 }
 
@@ -127,9 +130,7 @@ pub fn clear() {
     let _ = set_position(0);
     set_text_color(Color::LightGray);
     set_bg_color(Color::Black);
-
-    let buffer = unsafe { &mut *VGA_BUFFER };
-    buffer.chars.fill(VgaChar::from(0));
+    VgaBuffer::get().chars.fill(VgaChar::from(0));
 }
 
 /// Writes one character to the console.
