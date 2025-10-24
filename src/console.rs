@@ -7,6 +7,8 @@ use crate::port;
 pub const WIDTH: usize = 80;
 /// Console height in characters.
 pub const HEIGHT: usize = 25;
+/// The total console size in characters, defined as `WIDTH * HEIGHT`.
+pub const SIZE: usize = WIDTH * HEIGHT;
 
 /// Text color for characters and background shown on the console.
 #[allow(dead_code)]
@@ -33,6 +35,7 @@ pub enum Color {
 
 impl TryFrom<u8> for Color {
     type Error = u8;
+
     fn try_from(val: u8) -> Result<Self, Self::Error> {
         match val {
             0..16 => Ok(unsafe { mem::transmute(val) }),
@@ -45,129 +48,132 @@ impl TryFrom<u8> for Color {
 #[repr(C)]
 struct VgaChar {
     char: u8,
-    color: u8,
-}
-
-impl VgaChar {
-    fn from(c: u8) -> Self {
-        Self {
-            char: c,
-            color: unsafe { COLOR },
-        }
-    }
+    attrs: u8,
 }
 
 #[repr(transparent)]
 struct VgaBuffer {
-    chars: [VgaChar; WIDTH * HEIGHT],
+    chars: [VgaChar; SIZE],
 }
 
 impl VgaBuffer {
     fn get() -> &'static mut Self {
         unsafe { &mut *(0xb8000 as *mut Self) }
     }
-}
 
-static mut POSITION: usize = 0;
-static mut COLOR: u8 = Color::LightGray as u8;
-
-fn update_cursor() {
-    unsafe {
-        port::out8(0x3d4, 0xf);
-        port::out8(0x3d5, (POSITION & 0xff) as u8);
-        port::out8(0x3d4, 0xe);
-        port::out8(0x3d5, ((POSITION >> 8) & 0xff) as u8);
-    }
-}
-
-/// Sets the current position of the console cursor. Returns `Ok` if the given cursor position is
-/// within bounds (`pos < WIDTH * HEIGHT`), otherwise returns `Err(pos)` and has no effect.
-pub fn set_position(pos: usize) -> Result<(), usize> {
-    if pos < WIDTH * HEIGHT {
+    fn update_cursor(position: usize) {
         unsafe {
-            POSITION = pos;
+            port::out8(0x3d4, 0xf);
+            port::out8(0x3d5, (position & 0xff) as u8);
+            port::out8(0x3d4, 0xe);
+            port::out8(0x3d5, ((position >> 8) & 0xff) as u8);
         }
-        update_cursor();
-        Ok(())
-    } else {
-        Err(pos)
     }
 }
 
-/// Returns the current position of the console cursor.
-pub fn get_position() -> usize {
-    unsafe { POSITION }
+/// Handle used for writing text to the VGA console.
+pub struct Writer {
+    position: usize,
+    attrs: u8,
 }
 
-/// Sets the text color for subsequent character writes to the console.
-pub fn set_text_color(color: Color) {
-    unsafe {
-        COLOR = COLOR & 0xf0 | color as u8;
+static mut WRITER: Writer = Writer {
+    position: 0,
+    attrs: Color::LightGray as u8,
+};
+
+#[allow(dead_code)]
+impl Writer {
+    /// Returns a mutable reference to the global console writer.
+    pub fn get() -> &'static mut Self {
+        unsafe { &mut *(&raw mut WRITER) }
     }
-}
 
-/// Sets the background color for subsequent character writes to the console.
-pub fn set_bg_color(color: Color) {
-    unsafe {
-        COLOR = COLOR & 0x0f | (color as u8) << 4;
-    }
-}
-
-fn advance(count: usize) {
-    let pos = get_position() + count;
-    if pos < WIDTH * HEIGHT {
-        let _ = set_position(pos);
-    } else {
-        let _ = set_position(WIDTH * (HEIGHT - 1));
-
-        // Scroll text lines up, and then clear the bottom line
-        let buffer = VgaBuffer::get();
-        for line in 1..HEIGHT {
-            let (prev, curr) = buffer.chars.split_at_mut(line * WIDTH);
-            prev[(line - 1) * WIDTH..].clone_from_slice(&curr[..WIDTH]);
+    /// Sets the current position of the console cursor. Returns `Ok` if the given cursor position
+    /// is within bounds (`pos < SIZE`), otherwise returns `Err(pos)` and has no effect.
+    pub fn set_position(&mut self, pos: usize) -> Result<(), usize> {
+        match pos {
+            0..SIZE => {
+                self.position = pos;
+                VgaBuffer::update_cursor(pos);
+                Ok(())
+            }
+            _ => Err(pos),
         }
-        buffer.chars[(HEIGHT - 1) * WIDTH..].fill(VgaChar::from(0));
+    }
+
+    /// Returns the current position of the console cursor.
+    pub fn get_position(&self) -> usize {
+        self.position
+    }
+
+    /// Sets the text color for subsequent character writes to the console.
+    pub fn set_text_color(&mut self, color: Color) {
+        self.attrs = self.attrs & 0xf0 | color as u8;
+    }
+
+    /// Sets the background color for subsequent character writes to the console.
+    pub fn set_bg_color(&mut self, color: Color) {
+        self.attrs = self.attrs & 0x0f | (color as u8) << 4;
+    }
+
+    fn advance(&mut self, count: usize) {
+        let pos = self.position + count;
+        if pos < SIZE {
+            self.position = pos;
+        } else {
+            self.position = WIDTH * (HEIGHT - 1);
+
+            // Scroll text lines up, and then clear the bottom line
+            let buffer = VgaBuffer::get();
+            for line in 1..HEIGHT {
+                let (prev, curr) = buffer.chars.split_at_mut(line * WIDTH);
+                prev[(line - 1) * WIDTH..].clone_from_slice(&curr[..WIDTH]);
+            }
+            buffer.chars[(HEIGHT - 1) * WIDTH..].fill(VgaChar {
+                char: 0,
+                attrs: self.attrs,
+            });
+        }
+
+        VgaBuffer::update_cursor(self.position);
+    }
+
+    fn put_byte(&mut self, b: u8) {
+        VgaBuffer::get().chars[self.position] = VgaChar {
+            char: b,
+            attrs: self.attrs,
+        };
+        self.advance(1);
+    }
+
+    /// Clears the console by removing all text and setting the default colors.
+    pub fn clear_screen(&mut self) {
+        self.position = 0;
+        self.set_text_color(Color::LightGray);
+        self.set_bg_color(Color::Black);
+        VgaBuffer::get().chars.fill(VgaChar {
+            char: 0,
+            attrs: self.attrs,
+        });
+    }
+
+    /// Writes one character to the console.
+    pub fn put_char(&mut self, c: char) {
+        match c {
+            '\0' => self.put_byte(0),
+            '\n' => self.advance(WIDTH - self.position % WIDTH),
+            ' '..='~' => self.put_byte(c as u8),
+            '\u{80}'.. => self.put_byte(0xfe),
+            _ => {}
+        }
     }
 }
 
-fn put_byte(b: u8) {
-    let pos = get_position();
-    VgaBuffer::get().chars[pos] = VgaChar::from(b);
-    advance(1);
-}
-
-/// Clears the console by removing all text.
-pub fn clear() {
-    let _ = set_position(0);
-    set_text_color(Color::LightGray);
-    set_bg_color(Color::Black);
-    VgaBuffer::get().chars.fill(VgaChar::from(0));
-}
-
-/// Writes one character to the console.
-pub fn put_char(c: char) {
-    match c {
-        '\0' => put_byte(0),
-        '\n' => advance(WIDTH - get_position() % WIDTH),
-        ' '..='~' => put_byte(c as u8),
-        '\u{80}'.. => put_byte(0xfe),
-        _ => {}
-    }
-}
-
-/// Used for writing strings to the console.
-pub struct ConsoleWriter {}
-
-impl ConsoleWriter {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl fmt::Write for ConsoleWriter {
+impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         for c in s.chars() {
-            put_char(c);
+            self.put_char(c);
         }
         Ok(())
     }
