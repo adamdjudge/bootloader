@@ -16,4 +16,4 @@ sudo objcopy -O binary target/x86-unknown-none/$BUILD/bootloader /mnt/stage2
 ls -lh /mnt/stage2
 sudo umount /mnt
 
-[ "$1" == "run" ] && qemu-system-i386 -fda boot.img
+[ "$1" == "run" ] && qemu-system-i386 -fda boot.img -serial stdio

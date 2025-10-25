@@ -3,41 +3,43 @@
 
 mod console;
 mod port;
+mod serial;
 
 use core::arch::{asm, global_asm};
 use core::fmt::Write;
 use core::panic::PanicInfo;
 
+use console::{Color, Writer};
+use serial::{BaudRate, ComPort, SerialPort};
+
 global_asm!(include_str!("start.s"), options(att_syntax));
 
 #[unsafe(no_mangle)]
 fn main() -> ! {
-    let mut writer = console::Writer::get();
+    let mut writer = Writer::get();
     writer.clear_screen();
     let _ = write!(&mut writer, "Hello from Rust on x86!\n\n");
 
-    for bg in 0..16 {
-        writer.set_bg_color(bg.try_into().unwrap());
-        for fg in 0..16 {
-            writer.set_text_color(fg.try_into().unwrap());
-            let _ = write!(&mut writer, " {:02x} ", bg << 4 | fg);
-        }
-        writer.put_char('\n');
+    let serial = SerialPort::get(ComPort::Com1);
+    serial.set_baud_rate(BaudRate::try_from(9600).unwrap());
+    serial.reset();
+    loop {
+        writer.put_char(serial.receive_byte() as char);
     }
 
-    loop {
-        unsafe {
-            asm!("hlt");
-        }
-    }
+    // loop {
+    //     unsafe {
+    //         asm!("hlt");
+    //     }
+    // }
 }
 
 #[inline(never)]
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    let mut writer = console::Writer::get();
-    writer.set_bg_color(console::Color::Black);
-    writer.set_text_color(console::Color::LightRed);
+    let mut writer = Writer::get();
+    writer.set_bg_color(Color::Black);
+    writer.set_text_color(Color::LightRed);
 
     if let Some(location) = info.location() {
         let _ = write!(
@@ -51,5 +53,9 @@ fn panic(info: &PanicInfo) -> ! {
         let _ = write!(&mut writer, "\npanicked - {}", info.message());
     }
 
-    loop {}
+    loop {
+        unsafe {
+            asm!("hlt");
+        }
+    }
 }
