@@ -2,6 +2,7 @@
 #![no_main]
 
 mod console;
+mod crc32;
 mod port;
 mod serial;
 
@@ -18,20 +19,16 @@ global_asm!(include_str!("start.s"), options(att_syntax));
 fn main() -> ! {
     let mut writer = Writer::get();
     writer.clear_screen();
-    let _ = write!(&mut writer, "Hello from Rust on x86!\n\n");
+    let _ = write!(&mut writer, "Loading kernel over COM1 at 9600 baud...\n");
 
     let serial = SerialPort::get(ComPort::Com1);
     serial.set_baud_rate(BaudRate::try_from(9600).unwrap());
     serial.reset();
-    loop {
-        writer.put_char(serial.receive_byte() as char);
-    }
 
-    // loop {
-    //     unsafe {
-    //         asm!("hlt");
-    //     }
-    // }
+    let start_addr = serial::load_kernel(&serial);
+    unsafe {
+        asm!("jmp eax", in("eax") start_addr, options(noreturn));
+    }
 }
 
 #[inline(never)]

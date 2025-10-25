@@ -1,3 +1,8 @@
+use core::fmt::Write;
+use core::slice;
+
+use crate::console::Writer;
+use crate::crc32::Crc32;
 use crate::port;
 
 /// (DLAB=0) (RW) Data FIFO offset
@@ -17,7 +22,11 @@ const LSR: u16 = 5;
 
 /// Minimum baud rate
 const MIN_BAUD: usize = 2;
+/// Maximum baud rate
 const MAX_BAUD: usize = 115200;
+
+/// Maximum number of program segments that can be loaded over serial
+const MAX_SEGMENTS: usize = 16;
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -87,11 +96,82 @@ impl SerialPort {
         }
     }
 
-    pub fn receive_dword(&self) -> u32 {
+    pub fn receive_u32(&self) -> u32 {
         let mut bytes = [0u8; 4];
         for i in 0..4 {
             bytes[i] = self.receive_byte();
         }
         u32::from_be_bytes(bytes)
     }
+}
+
+#[derive(Default, Clone, Copy)]
+struct Segment {
+    addr: u32,
+    size: u32,
+}
+
+pub fn load_kernel(serial: &SerialPort) -> u32 {
+    let mut segments = [Segment::default(); MAX_SEGMENTS];
+    let mut writer = Writer::get();
+    let mut crc = Crc32::new();
+
+    let start_addr = serial.receive_u32();
+    crc.crc32_u32(start_addr);
+    let _ = write!(&mut writer, "start address: 0x{:08x}\n", start_addr);
+
+    let segments_count = serial.receive_u32() as usize;
+    crc.crc32_u32(segments_count as u32);
+    assert!(
+        segments_count <= MAX_SEGMENTS,
+        "segment count {} is too large, max supported is {}",
+        segments_count,
+        MAX_SEGMENTS,
+    );
+    let _ = write!(&mut writer, "segments count: {}\n", segments_count);
+
+    for i in 0..segments_count {
+        let segment = Segment {
+            addr: serial.receive_u32(),
+            size: serial.receive_u32(),
+        };
+        crc.crc32_u32(segment.addr);
+        crc.crc32_u32(segment.size);
+        segments[i] = segment;
+    }
+
+    let data_checksum = serial.receive_u32();
+    crc.crc32_u32(data_checksum);
+
+    let header_checksum = serial.receive_u32();
+    let crc32 = crc.finish();
+    assert_eq!(
+        header_checksum, crc32,
+        "header checksum 0x{:x} does not match computed CRC-32 0x{:x}",
+        header_checksum, crc32
+    );
+
+    let mut crc = Crc32::new();
+    for segment in segments.iter() {
+        let _ = write!(
+            &mut writer,
+            "load segment: addr=0x{:08x} size=0x{:08x}\n",
+            segment.addr, segment.size
+        );
+        let segment =
+            unsafe { slice::from_raw_parts_mut(segment.addr as *mut u8, segment.size as usize) };
+        for i in 0..segment.len() {
+            segment[i] = serial.receive_byte();
+        }
+        crc.crc32_slice(segment);
+    }
+
+    let crc32 = crc.finish();
+    assert_eq!(
+        data_checksum, crc32,
+        "data checksum 0x{:x} does not match computed CRC-32 0x{:x}",
+        data_checksum, crc32
+    );
+
+    start_addr
 }
