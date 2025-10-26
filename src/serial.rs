@@ -101,7 +101,7 @@ impl SerialPort {
         for i in 0..4 {
             bytes[i] = self.receive_byte();
         }
-        u32::from_be_bytes(bytes)
+        u32::from_le_bytes(bytes)
     }
 }
 
@@ -151,8 +151,7 @@ pub fn load_kernel(serial: &SerialPort) -> u32 {
         header_checksum, crc32
     );
 
-    let mut crc = Crc32::new();
-    for segment in segments.iter() {
+    for segment in segments.iter().take(segments_count) {
         let _ = write!(
             &mut writer,
             "load segment: addr=0x{:08x} size=0x{:08x}\n",
@@ -163,9 +162,14 @@ pub fn load_kernel(serial: &SerialPort) -> u32 {
         for i in 0..segment.len() {
             segment[i] = serial.receive_byte();
         }
-        crc.crc32_slice(segment);
     }
 
+    let mut crc = Crc32::new();
+    for segment in segments.iter().take(segments_count) {
+        crc.crc32_slice(unsafe {
+            slice::from_raw_parts_mut(segment.addr as *mut u8, segment.size as usize)
+        });
+    }
     let crc32 = crc.finish();
     assert_eq!(
         data_checksum, crc32,

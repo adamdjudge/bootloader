@@ -12,6 +12,8 @@ GDT_DS = 0x10
 
 .section .text.start
 
+.global _start
+
 .code16
 _start:
     cli

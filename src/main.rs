@@ -27,7 +27,11 @@ fn main() -> ! {
 
     let start_addr = serial::load_kernel(&serial);
     unsafe {
-        asm!("jmp eax", in("eax") start_addr, options(noreturn));
+        asm!(
+            "jmp eax",
+            in("eax") start_addr,
+            options(noreturn)
+        );
     }
 }
 
