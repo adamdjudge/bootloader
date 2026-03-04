@@ -19,10 +19,10 @@ global_asm!(include_str!("start.s"), options(att_syntax));
 fn main() -> ! {
     let mut writer = Writer::get();
     writer.clear_screen();
-    let _ = write!(&mut writer, "Loading kernel over COM1 at 9600 baud...\n");
+    let _ = write!(&mut writer, "Loading kernel over COM1 at 19200 baud...\n");
 
     let serial = SerialPort::get(ComPort::Com1);
-    serial.set_baud_rate(BaudRate::try_from(9600).unwrap());
+    serial.set_baud_rate(BaudRate::try_from(19200).unwrap());
     serial.reset();
 
     let start_addr = serial::load_kernel(&serial);
