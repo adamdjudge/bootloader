@@ -11,21 +11,20 @@ use core::fmt::Write;
 use core::panic::PanicInfo;
 
 use console::{Color, Writer};
-use serial::{BaudRate, ComPort, SerialPort};
+use serial::{ComPort, SerialPort};
 
 global_asm!(include_str!("start.s"), options(att_syntax));
 
 #[unsafe(no_mangle)]
 fn main() -> ! {
-    let mut writer = Writer::get();
+    let writer = Writer::get();
     writer.clear_screen();
-    let _ = write!(&mut writer, "Loading kernel over COM1 at 19200 baud...\n");
+    let _ = write!(writer, "Loading kernel over COM1 at 19200 baud...\n");
 
-    let serial = SerialPort::get(ComPort::Com1);
-    serial.set_baud_rate(BaudRate::try_from(19200).unwrap());
-    serial.reset();
-
+    let serial = SerialPort::get(ComPort::Com1, 19200);
     let start_addr = serial::load_kernel(&serial);
+
+    // Jump to the start address of the kernel, ending bootloader execution.
     unsafe {
         asm!(
             "jmp eax",
@@ -35,23 +34,28 @@ fn main() -> ! {
     }
 }
 
+/// Global panic handler for the bootloader.
 #[inline(never)]
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    let mut writer = Writer::get();
+    unsafe {
+        asm!("cli");
+    }
+
+    let writer = Writer::get();
     writer.set_bg_color(Color::Black);
     writer.set_text_color(Color::LightRed);
 
     if let Some(location) = info.location() {
         let _ = write!(
-            &mut writer,
+            writer,
             "\npanicked at {}:{} - {}",
             location.file(),
             location.line(),
             info.message()
         );
     } else {
-        let _ = write!(&mut writer, "\npanicked - {}", info.message());
+        let _ = write!(writer, "\npanicked - {}", info.message());
     }
 
     loop {
