@@ -27,7 +27,9 @@ fn main() -> ! {
     // Jump to the start address of the kernel, ending bootloader execution.
     unsafe {
         asm!(
-            "jmp eax",
+            "mov esp, __loram_top
+            push 0
+            jmp eax",
             in("eax") start_addr,
             options(noreturn)
         );

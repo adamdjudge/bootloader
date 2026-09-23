@@ -1,6 +1,6 @@
 # ==============================================================================
 # The SakuraOS Bootloader
-# Copyright 2025 Adam Judge
+# Copyright 2026 Adam Judge
 # ==============================================================================
 
 GDT_CS = 0x08
@@ -13,10 +13,11 @@ GDT_DS = 0x10
 .section .text.start
 
 .global _start
-
 .code16
 _start:
     cli
+    cld
+    mov $__loram_top, %esp
 
     # Enable A20 through the keyboard controller.
     call kbc_wait
@@ -52,27 +53,35 @@ enter_protected_mode:
     mov %ax, %es
     mov %ax, %fs
     mov %ax, %gs
-    mov $__loram_top, %esp
+
+    # Clear out the BSS before starting Rust.
+    mov $__bss_start, %edi
+    mov $__bss_end, %ecx
+    sub $__bss_start, %ecx
+    add $3, %ecx
+    shr $2, %ecx
+    xor %eax, %eax
+    rep stosl
+
+    # Jump to Rust execution.
     jmp main
 
 # ==============================================================================
 # Processor Data Structures
 # ==============================================================================
 
-.align 2
-
-# GDT Descriptor
-# Kept in .text.start to ensure it doesn't go out of range of 16-bit address
-gdt_desc:
-    .short gdt_end - gdt_start - 1
-    .int gdt_start
-
-.rodata
-.align 8
+.section .rodata.gdt
 
 # Global Descriptor Table
+.align 8
 gdt_start:
     .quad 0x0000000000000000  # Null segment
     .quad 0x00CF9B000000FFFF  # Code segment
     .quad 0x00CF93000000FFFF  # Data segment
 gdt_end:
+
+# GDT Descriptor
+.align 2
+gdt_desc:
+    .short gdt_end - gdt_start - 1
+    .int gdt_start
