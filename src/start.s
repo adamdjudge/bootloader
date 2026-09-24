@@ -16,8 +16,6 @@ GDT_DS = 0x10
 .code16
 _start:
     cli
-    cld
-    mov $__loram_top, %esp
 
     # Enable A20 through the keyboard controller.
     call kbc_wait
@@ -63,7 +61,8 @@ enter_protected_mode:
     xor %eax, %eax
     rep stosl
 
-    # Jump to Rust execution.
+    # Set 32-bit stack pointer and jump to Rust execution.
+    mov $__loram_top, %esp
     jmp main
 
 # ==============================================================================

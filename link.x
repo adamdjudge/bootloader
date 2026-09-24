@@ -11,6 +11,7 @@ SECTIONS
     .text :
     {
         KEEP(*(.text.start))
+        *(.text.gdt)
         *(.text .text.*)
     } > LO_RAM
 
@@ -19,7 +20,7 @@ SECTIONS
         *(.rodata .rodata.*)
     } > LO_RAM
 
-    .data :
+    .data ALIGN(4K) :
     {
         *(.data .data.*)
     } > LO_RAM

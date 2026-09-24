@@ -24,7 +24,7 @@ fn main() -> ! {
     let serial = SerialPort::get(ComPort::Com1, 19200);
     let start_addr = serial::load_kernel(&serial);
 
-    // Jump to the start address of the kernel, ending bootloader execution.
+    // Reset the stack pointer and push a null return address, then transfer execution to kernel.
     unsafe {
         asm!(
             "mov esp, __loram_top
