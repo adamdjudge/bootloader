@@ -3,6 +3,7 @@
 
 mod console;
 mod crc32;
+mod memory;
 mod port;
 mod serial;
 
@@ -19,8 +20,19 @@ global_asm!(include_str!("start.s"), options(att_syntax));
 fn main() -> ! {
     let writer = Writer::get();
     writer.clear_screen();
-    let _ = write!(writer, "Loading kernel over COM1 at 19200 baud...\n");
 
+    let _ = write!(writer, "Memory regions from BIOS:\n");
+    for region in memory::get_regions() {
+        let _ = write!(
+            writer,
+            "  0x{:08x} - 0x{:08x} {:?}\n",
+            region.addr,
+            region.addr + region.size - 1,
+            region.rtype
+        );
+    }
+
+    let _ = write!(writer, "Loading kernel over COM1 at 19200 baud...\n");
     let serial = SerialPort::get(ComPort::Com1, 19200);
     let start_addr = serial::load_kernel(&serial);
 

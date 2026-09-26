@@ -3,8 +3,12 @@
 # Copyright 2026 Adam Judge
 # ==============================================================================
 
+# Segment offsets
 GDT_CS = 0x08
 GDT_DS = 0x10
+
+# BIOS E820 call memory region structure size
+REGION_STRUCT_SIZE = 24
 
 # ==============================================================================
 # Real-mode entry point from boot sector
@@ -12,10 +16,31 @@ GDT_DS = 0x10
 
 .section .text.start
 
-.global _start
 .code16
 _start:
     cli
+
+    # Detect memory regions using the BIOS E820 call.
+    xor %ebx, %ebx
+    mov $e820_regions, %di
+.e820_loop:
+    mov $0xE820, %eax
+    mov $REGION_STRUCT_SIZE, %ecx
+    mov $0x534D4150, %edx
+    int $0x15
+
+    jc .e820_done
+    cmp $0x534D4150, %eax
+    jne .e820_done
+    cmp $0, %ebx
+    je .e820_done
+
+    add $REGION_STRUCT_SIZE, %di
+    incl e820_regions_count
+    jmp .e820_loop
+
+.e820_done:
+    clc
 
     # Enable A20 through the keyboard controller.
     call kbc_wait
@@ -66,10 +91,9 @@ enter_protected_mode:
     jmp main
 
 # ==============================================================================
-# Processor Data Structures
+# Data Structure Definitions
+# Kept in .text.start to ensure they remain within 16-bit addressing
 # ==============================================================================
-
-.section .rodata.gdt
 
 # Global Descriptor Table
 .align 8
@@ -84,3 +108,10 @@ gdt_end:
 gdt_desc:
     .short gdt_end - gdt_start - 1
     .int gdt_start
+
+# BIOS memory region array
+.align 4
+e820_regions:
+    .space REGION_STRUCT_SIZE * 16
+e820_regions_count:
+    .space 4
