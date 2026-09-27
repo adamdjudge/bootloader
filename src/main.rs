@@ -9,10 +9,9 @@ mod port;
 mod serial;
 
 use core::arch::{asm, global_asm};
-use core::fmt::Write;
 use core::panic::PanicInfo;
 
-use console::{Color, Writer};
+use console::Color;
 use serial::{ComPort, SerialPort};
 
 global_asm!(include_str!("start.s"), options(att_syntax));
@@ -20,22 +19,19 @@ global_asm!(include_str!("start.s"), options(att_syntax));
 #[unsafe(no_mangle)]
 fn main() -> ! {
     mmu::init();
+    console::clear();
 
-    let writer = Writer::get();
-    writer.clear_screen();
-
-    let _ = write!(writer, "Memory regions from BIOS:\n");
+    println!("Memory regions from BIOS:");
     for region in memory::get_regions() {
-        let _ = write!(
-            writer,
-            "  0x{:08x} - 0x{:08x} {:?}\n",
+        println!(
+            "  0x{:08x} - 0x{:08x} {:?}",
             region.addr,
             region.addr + region.size - 1,
             region.rtype
         );
     }
 
-    let _ = write!(writer, "Loading kernel over COM1 at 19200 baud...\n");
+    println!("Loading kernel over COM1 at 19200 baud...");
     let serial = SerialPort::get(ComPort::Com1, 19200);
     let start_addr = serial::load_kernel(&serial);
 
@@ -59,20 +55,18 @@ fn panic(info: &PanicInfo) -> ! {
         asm!("cli");
     }
 
-    let writer = Writer::get();
-    writer.set_bg_color(Color::Black);
-    writer.set_text_color(Color::LightRed);
+    console::set_bg_color(Color::Black);
+    console::set_text_color(Color::LightRed);
 
     if let Some(location) = info.location() {
-        let _ = write!(
-            writer,
+        print!(
             "\npanicked at {}:{} - {}",
             location.file(),
             location.line(),
             info.message()
         );
     } else {
-        let _ = write!(writer, "\npanicked - {}", info.message());
+        print!("\npanicked - {}", info.message());
     }
 
     loop {

@@ -1,9 +1,7 @@
-use core::fmt::Write;
 use core::slice;
 
-use crate::console::Writer;
 use crate::crc32::Crc32;
-use crate::port;
+use crate::{port, println};
 
 /// (DLAB=0) (RW) Data FIFO offset
 const FIFO: u16 = 0;
@@ -115,7 +113,7 @@ struct Segment {
 /// Loads a kernel into memory over the given serial port, and returns its start address. Blocks
 /// execution until a full executable has been loaded. Panics if the received executable is invalid
 /// or if there is a checksum failure.
-/// 
+///
 /// The kernel executable image received over serial is expected to contain a header, made of little
 /// endian u32 fields, followed by a byte stream of all the segments concatenated together. The
 /// header has the following format:
@@ -126,16 +124,15 @@ struct Segment {
 ///     - Size in bytes (u32)
 ///   - CRC-32 data checksum (u32)
 ///   - CRC-32 header checksum (u32)
-/// 
+///
 /// NOTE: Use sendelf.py to parse ELF executables and emit an image to send over serial.
 pub fn load_kernel(serial: &SerialPort) -> u32 {
-    let writer = Writer::get();
     let mut crc = Crc32::new();
 
     // Receive start address dword.
     let start_addr = serial.receive_u32();
     crc.crc32_u32(start_addr);
-    let _ = write!(writer, "start address: 0x{:08x}\n", start_addr);
+    println!("start address: 0x{:08x}", start_addr);
 
     // Receive segments count dword.
     let segments_count = serial.receive_u32() as usize;
@@ -146,7 +143,7 @@ pub fn load_kernel(serial: &SerialPort) -> u32 {
         segments_count,
         MAX_SEGMENTS,
     );
-    let _ = write!(writer, "segments count: {}\n", segments_count);
+    println!("segments count: {}", segments_count);
 
     // Receive segments array. Each segment contains an address dword and size dword.
     let mut segments = [Segment::default(); MAX_SEGMENTS];
@@ -177,9 +174,8 @@ pub fn load_kernel(serial: &SerialPort) -> u32 {
     // Receive data for each segment and load into memory, computing data checksum from all bytes.
     let mut crc = Crc32::new();
     for segment in segments.iter().take(segments_count) {
-        let _ = write!(
-            writer,
-            "load segment: addr=0x{:08x} size=0x{:08x}\n",
+        println!(
+            "load segment: addr=0x{:08x} size=0x{:08x}",
             segment.addr, segment.size
         );
 

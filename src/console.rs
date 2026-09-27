@@ -1,4 +1,5 @@
 use core::fmt;
+use core::fmt::Write;
 use core::mem;
 
 use crate::port;
@@ -11,7 +12,7 @@ pub const HEIGHT: usize = 25;
 pub const SIZE: usize = WIDTH * HEIGHT;
 
 /// Text color for characters and background shown on the console.
-#[allow(dead_code)]
+#[allow(unused)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u8)]
 pub enum Color {
@@ -72,7 +73,7 @@ impl VgaBuffer {
 }
 
 /// Handle used for writing text to the VGA console.
-pub struct Writer {
+struct Writer {
     position: usize,
     attrs: u8,
 }
@@ -82,16 +83,15 @@ static mut WRITER: Writer = Writer {
     attrs: Color::LightGray as u8,
 };
 
-#[allow(dead_code)]
 impl Writer {
     /// Returns a mutable reference to the global console writer.
-    pub fn get() -> &'static mut Self {
+    fn get() -> &'static mut Self {
         unsafe { &mut *(&raw mut WRITER) }
     }
 
     /// Sets the current position of the console cursor. Returns `Ok` if the given cursor position
     /// is within bounds (`pos < SIZE`), otherwise returns `Err(pos)` and has no effect.
-    pub fn set_position(&mut self, pos: usize) -> Result<(), usize> {
+    fn set_position(&mut self, pos: usize) -> Result<(), usize> {
         match pos {
             0..SIZE => {
                 self.position = pos;
@@ -102,18 +102,13 @@ impl Writer {
         }
     }
 
-    /// Returns the current position of the console cursor.
-    pub fn get_position(&self) -> usize {
-        self.position
-    }
-
     /// Sets the text color for subsequent character writes to the console.
-    pub fn set_text_color(&mut self, color: Color) {
+    fn set_text_color(&mut self, color: Color) {
         self.attrs = self.attrs & 0xf0 | color as u8;
     }
 
     /// Sets the background color for subsequent character writes to the console.
-    pub fn set_bg_color(&mut self, color: Color) {
+    fn set_bg_color(&mut self, color: Color) {
         self.attrs = self.attrs & 0x0f | (color as u8) << 4;
     }
 
@@ -149,7 +144,7 @@ impl Writer {
 
     /// Clears the console by removing all text and setting the default colors.
     pub fn clear_screen(&mut self) {
-        self.position = 0;
+        let _ = self.set_position(0);
         self.set_text_color(Color::LightGray);
         self.set_bg_color(Color::Black);
         VgaBuffer::get().chars.fill(VgaChar {
@@ -177,4 +172,44 @@ impl fmt::Write for Writer {
         }
         Ok(())
     }
+}
+
+/// Clears the console by removing all text and setting the default colors.
+pub fn clear() {
+    Writer::get().clear_screen();
+}
+
+/// Sets the text color for subsequent character writes to the console.
+pub fn set_text_color(color: Color) {
+    Writer::get().set_text_color(color);
+}
+
+/// Sets the background color for subsequent character writes to the console.
+pub fn set_bg_color(color: Color) {
+    Writer::get().set_bg_color(color);
+}
+
+#[doc(hidden)]
+pub fn _write(args: fmt::Arguments) {
+    let _ = Writer::get().write_fmt(args);
+}
+
+#[doc(hidden)]
+pub fn _writeln(args: fmt::Arguments) {
+    let writer = Writer::get();
+    let _ = writer.write_fmt(args);
+    let _ = writer.write_str("\n");
+}
+
+/// Prints to the VGA console.
+#[macro_export]
+macro_rules! print {
+    ($($arg:tt)*) => (crate::console::_write(format_args!($($arg)*)));
+}
+
+/// Prints to the VGA console, with a newline added to the end.
+#[macro_export]
+macro_rules! println {
+    () => (crate::print!("\n"));
+    ($($arg:tt)*) => (crate::console::_writeln(format_args!($($arg)*)));
 }
