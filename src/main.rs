@@ -4,6 +4,7 @@
 mod console;
 mod crc32;
 mod memory;
+mod mmu;
 mod port;
 mod serial;
 
@@ -18,6 +19,8 @@ global_asm!(include_str!("start.s"), options(att_syntax));
 
 #[unsafe(no_mangle)]
 fn main() -> ! {
+    mmu::init();
+
     let writer = Writer::get();
     writer.clear_screen();
 

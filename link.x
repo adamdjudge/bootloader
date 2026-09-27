@@ -16,6 +16,7 @@ SECTIONS
 {
     .text :
     {
+        __bootloader_base = .;
         KEEP(*(.text.start))
         *(.text .text.*)
     } > LO_RAM :text
@@ -27,6 +28,7 @@ SECTIONS
 
     .data ALIGN(4K) :
     {
+        __bootloader_data = .;
         *(.data .data.*)
     } > LO_RAM :data
 
@@ -37,7 +39,7 @@ SECTIONS
     } > LO_RAM :data
 
     __bss_end = .;
-    __loram_top = ORIGIN(LO_RAM) + LENGTH(LO_RAM);
+    __bootloader_top = .;
 
     /DISCARD/ :
     {
@@ -45,4 +47,6 @@ SECTIONS
         *(.eh_frame*)
         *(.note .note.*)
     }
+
+    __loram_top = ORIGIN(LO_RAM) + LENGTH(LO_RAM);
 }
