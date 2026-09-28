@@ -143,7 +143,7 @@ impl Writer {
     }
 
     /// Clears the console by removing all text and setting the default colors.
-    pub fn clear_screen(&mut self) {
+    fn clear_screen(&mut self) {
         let _ = self.set_position(0);
         self.set_text_color(Color::LightGray);
         self.set_bg_color(Color::Black);
@@ -154,7 +154,7 @@ impl Writer {
     }
 
     /// Writes one character to the console.
-    pub fn put_char(&mut self, c: char) {
+    fn put_char(&mut self, c: char) {
         match c {
             '\0' => self.put_byte(0),
             '\n' => self.advance(WIDTH - self.position % WIDTH),
@@ -198,7 +198,7 @@ pub fn _write(args: fmt::Arguments) {
 pub fn _writeln(args: fmt::Arguments) {
     let writer = Writer::get();
     let _ = writer.write_fmt(args);
-    let _ = writer.write_str("\n");
+    let _ = writer.put_char('\n');
 }
 
 /// Prints to the VGA console.

@@ -31,6 +31,10 @@ fn main() -> ! {
         );
     }
 
+    mmu::map_range(0xC0000000, 4);
+    unsafe { *(0xC0000000 as *mut u32) = 0xCAFEBABE; }
+    println!("0x{:x}", unsafe { *(0xC0000000 as *const u32) });
+
     println!("Loading kernel over COM1 at 19200 baud...");
     let serial = SerialPort::get(ComPort::Com1, 19200);
     let start_addr = serial::load_kernel(&serial);
