@@ -3,6 +3,7 @@
 
 mod console;
 mod crc32;
+mod loader;
 mod memory;
 mod mmu;
 mod port;
@@ -12,6 +13,7 @@ use core::arch::{asm, global_asm};
 use core::panic::PanicInfo;
 
 use console::Color;
+use loader::Loader;
 use serial::{ComPort, SerialPort};
 
 global_asm!(include_str!("start.s"), options(att_syntax));
@@ -31,9 +33,8 @@ fn main() -> ! {
         );
     }
 
-    mmu::map_range(0xC0000000, 4);
-    unsafe { *(0xC0000000 as *mut u32) = 0xCAFEBABE; }
-    println!("0x{:x}", unsafe { *(0xC0000000 as *const u32) });
+    let loader = loader::TestLoader;
+    let _ = loader.load_kernel();
 
     println!("Loading kernel over COM1 at 19200 baud...");
     let serial = SerialPort::get(ComPort::Com1, 19200);

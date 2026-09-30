@@ -16,12 +16,12 @@ static mut NEXT_LOMEM_FRAME: u32 = 0;
 static mut NEXT_HIMEM_FRAME: u32 = 0x100000;
 
 #[inline]
-const fn page_align_up(addr: u32) -> u32 {
+pub const fn page_align_up(addr: u32) -> u32 {
     (addr + PAGE_SIZE as u32 - 1) & PAGE_MASK
 }
 
 #[inline]
-const fn page_align_down(addr: u32) -> u32 {
+pub const fn page_align_down(addr: u32) -> u32 {
     addr & PAGE_MASK
 }
 
