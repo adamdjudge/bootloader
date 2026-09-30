@@ -24,17 +24,19 @@ fn main() -> ! {
     console::clear();
 
     println!("Memory regions from BIOS:");
-    for region in memory::get_regions() {
+    let regions = memory::get_regions();
+    for region in regions {
         println!(
             "  0x{:08x} - 0x{:08x} {:?}",
             region.addr,
-            region.addr + region.size - 1,
+            region.addr + region.size as u32 - 1,
             region.rtype
         );
     }
 
     let loader = loader::TestLoader;
-    let _ = loader.load_kernel();
+    let (_, base) = loader.load_kernel(regions).unwrap();
+    println!("KernelAddress: virt_base=0x{:08x} phys_base=0x{:08x}", base.virt_base, base.phys_base);
 
     println!("Loading kernel over COM1 at 19200 baud...");
     let serial = SerialPort::get(ComPort::Com1, 19200);

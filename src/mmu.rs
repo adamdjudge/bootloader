@@ -9,11 +9,10 @@ unsafe extern "C" {
     static __loram_top: u8;
 }
 
-const PAGE_SIZE: usize = 4096;
-const PAGE_MASK: u32 = 0xfffff000;
+pub const PAGE_SIZE: usize = 4096;
+pub const PAGE_MASK: u32 = 0xfffff000;
 
 static mut NEXT_LOMEM_FRAME: u32 = 0;
-static mut NEXT_HIMEM_FRAME: u32 = 0x100000;
 
 #[inline]
 pub const fn page_align_up(addr: u32) -> u32 {
@@ -145,13 +144,17 @@ pub fn init() {
     }
 }
 
-/// Maps pages into the virtual address space for a given range, with size given in bytes. Physical
-/// frames are allocated contiguously, and all mapped as both readable and writable. Pages already
-/// mapped within the range are not affected.
-pub fn map_range(vaddr: u32, size: usize) {
-    let top = vaddr + size as u32;
-    let mut vaddr = page_align_down(vaddr);
-    while vaddr < top {
+/// Maps a contiguous range of the virtual address space, with size given in bytes, to a contiguous
+/// range of physical memory starting at `phys_base`, which is expected to be the page-aligned base
+/// address of a physical memory region. All virtual addresses within the range will thus have the
+/// same offset from the physical addresses they are mapped to. The entire virtual address range is
+/// mapped as both readable and writable.
+pub fn map_range(phys_base: u32, vaddr: u32, size: usize) {
+    let vbase = page_align_down(vaddr);
+    let vtop = vaddr + size as u32;
+    let map_offset = vbase - phys_base;
+
+    for vaddr in (vbase..vtop).step_by(PAGE_SIZE) {
         // Allocate a new page table if one is not already present for this virtual address.
         let pte_slot = unsafe { &mut PAGE_DIRECTORY[(vaddr >> 22) as usize] };
         if !pte_slot.is_present() {
@@ -160,35 +163,28 @@ pub fn map_range(vaddr: u32, size: usize) {
             *pte_slot = pte;
         }
 
-        // If the address is not already mapped, allocate and map a new high memory frame.
+        // Map a physical frame if one is not already present for this virtual address.
         let ptes_base = 0x7FC00000 as *mut PageTableEntry;
         let pte_slot = unsafe { &mut *ptes_base.add((vaddr >> 12) as usize) };
         if !pte_slot.is_present() {
-            let frame = unsafe {
-                let frame = NEXT_HIMEM_FRAME;
-                NEXT_HIMEM_FRAME += PAGE_SIZE as u32;
-                frame
-            };
-            *pte_slot = PageTableEntry::new(frame).with_writable();
+            *pte_slot = PageTableEntry::new(vaddr - map_offset).with_writable();
         }
-        
-        vaddr += PAGE_SIZE as u32;
     }
 }
 
-/// Marks a range of the virtual address space as read-only, with size given in bytes. Unmapped
+/// Marks a range of the virtual address space, with size given in bytes, as read-only. Unmapped
 /// portions within the range are skipped.
 pub fn write_protect_range(vaddr: u32, size: usize) {
-    let top = vaddr + size as u32;
-    let mut vaddr = page_align_down(vaddr);
-    while vaddr < top {
+    let vbase = page_align_down(vaddr);
+    let vtop = vaddr + size as u32;
+
+    for vaddr in (vbase..vtop).step_by(PAGE_SIZE) {
         let pte_slot = unsafe { &PAGE_DIRECTORY[(vaddr >> 22) as usize] };
         if pte_slot.is_present() {
             let ptes_base = 0x7FC00000 as *mut PageTableEntry;
             let pte_slot = unsafe { &mut *ptes_base.add((vaddr >> 12) as usize) };
             pte_slot.set_writable(false);
         }
-        vaddr += PAGE_SIZE as u32;
     }
 
     // Reload page directory to flush the TLB.

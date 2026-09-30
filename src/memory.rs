@@ -17,7 +17,7 @@ pub enum Type {
 pub struct E820Region {
     pub addr: u32,
     pad1: u32,
-    pub size: u32,
+    pub size: usize,
     pad2: u32,
     pub rtype: Type,
     pub acpi_attr: u32,
